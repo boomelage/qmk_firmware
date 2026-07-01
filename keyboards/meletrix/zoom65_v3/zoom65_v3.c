@@ -18,9 +18,42 @@ typedef union {
         uint8_t chk_bat : 1;
         uint8_t record_last_mode;
         uint8_t last_btdevs : 3;
+        uint8_t bat_ind_off : 1;
     };
 } confinfo_t;
 confinfo_t confinfo;
+
+// Hold Fn+M (or Space+M) while powering on, for this long, to toggle the
+// FN_INDEX battery indicator on/off. Mirrors stock firmware's disable combo,
+// which this fork otherwise dropped when enable_bat_indicators became a
+// straight read of WIRELESS_SW_PIN.
+#define BAT_IND_TOGGLE_HOLD_MS 10000
+
+static void check_bat_indicator_toggle_combo(void) {
+    matrix_scan();
+    bool fn_held    = matrix_is_on(4, 11);
+    bool space_held = matrix_is_on(4, 3) || matrix_is_on(4, 5) || matrix_is_on(4, 7);
+    bool m_held     = matrix_is_on(3, 7);
+
+    if (!m_held || !(fn_held || space_held)) {
+        return;
+    }
+
+    uint32_t hold_start = timer_read32();
+    while (timer_elapsed32(hold_start) < BAT_IND_TOGGLE_HOLD_MS) {
+        wait_ms(20);
+        matrix_scan();
+        fn_held    = matrix_is_on(4, 11);
+        space_held = matrix_is_on(4, 3) || matrix_is_on(4, 5) || matrix_is_on(4, 7);
+        m_held     = matrix_is_on(3, 7);
+        if (!m_held || !(fn_held || space_held)) {
+            return; // released early; treat as accidental, don't toggle
+        }
+    }
+
+    confinfo.bat_ind_off = !confinfo.bat_ind_off;
+    eeconfig_update_kb(confinfo.raw);
+}
 
 uint32_t post_init_timer       = 0x00;
 bool     lower_sleep           = false;
@@ -49,6 +82,9 @@ void eeconfig_confinfo_init(void) {
 void keyboard_post_init_kb(void) {
     // initialize configuration from eeprom
     eeconfig_confinfo_init();
+
+    // hold Fn+M or Space+M at power-on for 10s to toggle the battery indicator
+    check_bat_indicator_toggle_combo();
 
     // configure peripheral pins
     gpio_set_pin_input(HS_BAT_CABLE_PIN);
@@ -296,7 +332,7 @@ void housekeeping_task_user(void) {
 
     charging_state        = gpio_read_pin(HS_BAT_CABLE_PIN);
     bat_full_flag         = gpio_read_pin(BAT_FULL_PIN);
-    enable_bat_indicators = gpio_read_pin(WIRELESS_SW_PIN);
+    enable_bat_indicators = gpio_read_pin(WIRELESS_SW_PIN) && !confinfo.bat_ind_off;
 
     if (charging_state && (bat_full_flag)) {
         hs_now_mode = MD_SND_CMD_DEVCTRL_CHARGING_DONE;
