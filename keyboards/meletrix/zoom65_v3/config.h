@@ -35,3 +35,4 @@
 
 /* Misc configuration */
 #define GRAVE_ESC_CTRL_OVERRIDE
+#define GRAVE_ESC_ALT_OVERRIDE

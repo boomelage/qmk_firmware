@@ -7,6 +7,7 @@
 #include "lowpower.h"
 #include "uart.h"
 #include "raw_hid.h"
+#include "os_detection.h"
 
 enum __layers { WIN_B, WIN_FN };
 
@@ -19,6 +20,7 @@ typedef union {
         uint8_t record_last_mode;
         uint8_t last_btdevs : 3;
         uint8_t bat_ind_off : 1;
+        uint8_t mac_mode : 1;
     };
 } confinfo_t;
 confinfo_t confinfo;
@@ -323,6 +325,23 @@ bool rgb_matrix_indicators_kb(void) {
     if (host_keyboard_led_state().caps_lock) {
         rgb_matrix_set_color(CAPS_INDEX, 255, 255, 255);
     }
+
+    // Mac-mode indicator: when the persisted Bluetooth Mac-mode is on, light the
+    // MAC_TOGG key green wherever it is mapped on the active layer. Reads the
+    // live (VIA-editable) keymap, so it follows remaps to any key/layer.
+    if (confinfo.mac_mode) {
+        uint8_t layer = get_highest_layer(layer_state);
+        for (uint8_t r = 0; r < MATRIX_ROWS; r++) {
+            for (uint8_t c = 0; c < MATRIX_COLS; c++) {
+                if (keymap_key_to_keycode(layer, (keypos_t){.col = c, .row = r}) == MAC_TOGG) {
+                    uint8_t led = g_led_config.matrix_co[r][c];
+                    if (led != NO_LED) {
+                        rgb_matrix_set_color(led, 255, 255, 255);
+                    }
+                }
+            }
+        }
+    }
     return true;
 }
 
@@ -363,6 +382,48 @@ bool process_record_kb(uint16_t keycode, keyrecord_t *record) {
         return false;
     }
     switch (keycode) {
+        case QK_GRAVE_ESCAPE: {
+            // GUI+Esc should type a bare backtick. macOS/iOS eat Cmd+grave (the
+            // in-app window cycle), so the GUI modifier must be stripped there;
+            // Windows instead breaks if GUI is stripped (a lone Win tap opens
+            // the Start menu). Decide per connection: USB uses OS detection;
+            // BT/2.4G uses the persisted Mac-mode toggle (OS is undetectable
+            // over Bluetooth). Ctrl/Alt combos are left alone so Ctrl+Shift+Esc
+            // (Task Manager) and Cmd+Opt+Esc (Force Quit) still send Esc.
+            static bool gui_grave_active = false;
+            if (record->event.pressed) {
+                uint8_t mods = get_mods();
+                if ((mods & MOD_MASK_GUI) && !(mods & (MOD_MASK_CTRL | MOD_MASK_ALT))) {
+                    bool strip;
+                    if (wireless_get_current_devs() == DEVS_USB) {
+                        os_variant_t os = detected_host_os();
+                        strip = (os == OS_MACOS || os == OS_IOS);
+                    } else {
+                        strip = confinfo.mac_mode;
+                    }
+                    if (strip) {
+                        uint8_t gui = mods & MOD_MASK_GUI;
+                        del_mods(gui);
+                        send_keyboard_report();
+                        tap_code(KC_GRV);
+                        add_mods(gui);
+                        send_keyboard_report();
+                        gui_grave_active = true;
+                        return false;
+                    }
+                }
+            } else if (gui_grave_active) {
+                gui_grave_active = false;
+                return false;
+            }
+            return true;
+        }
+        case MAC_TOGG:
+            if (record->event.pressed) {
+                confinfo.mac_mode = !confinfo.mac_mode;
+                eeconfig_update_kb(confinfo.raw);
+            }
+            return false;
         case DF(WIN_B):
             if (record->event.pressed) {
                 set_single_persistent_default_layer(WIN_B);

@@ -134,6 +134,11 @@
       "name"     : "SCREEN_SWITCH",
       "title"    : "Switch screen",
       "shortName": "SC_SWCH"
+    },
+    {
+      "name"     : "MAC_MODE_TOGGLE",
+      "title"    : "Mac mode: GUI+Esc backtick (BT)",
+      "shortName": "MAC_TOGG"
     }
   ],
   "layouts": {

@@ -41,7 +41,8 @@
         {"key": "SC_UP"  },
         {"key": "SC_DOWN"},
         {"key": "SC_TOGG"},
-        {"key": "SC_SWCH"}
+        {"key": "SC_SWCH"},
+        {"key": "MAC_TOGG"}
     ],
     "matrix_pins": {
         "cols": [
