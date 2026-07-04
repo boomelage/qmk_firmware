@@ -1,2 +1,2 @@
-include keyboards/westberry/wireless/wireless.mk
-include keyboards/meletrix/zoom65_v3/wls/wls.mk
+# Wired-only variant: the westberry wireless driver and the wls helper are
+# intentionally NOT included (that is the whole point of this revision).

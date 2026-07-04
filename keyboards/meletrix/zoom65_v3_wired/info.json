@@ -1,5 +1,5 @@
 {
-    "keyboard_name": "Zoom65 v3",
+    "keyboard_name": "Zoom65 v3 Wired",
     "manufacturer": "Meletrix",
     "maintainer": "self@ossian.dev",
     "usb": {
@@ -32,12 +32,6 @@
     },
     "dynamic_keymap": {"layer_count": 16},
     "keycodes": [
-        {"key": "BT_PRF1"},
-        {"key": "BT_PRF2"},
-        {"key": "BT_PRF3"},
-        {"key": "BT_PRF4"},
-        {"key": "BT_PRF5"},
-        {"key": "OU_2P4G"},
         {"key": "SC_UP"  },
         {"key": "SC_DOWN"},
         {"key": "SC_TOGG"},
